@@ -1,5 +1,8 @@
-# from .foo import FooTest
+from .sdist import TarSdistTest, ZipSdistTest
+from .wheel import WheelTest
 
 __all__ = [
-    # "FooTest",
+    "WheelTest",
+    "ZipSdistTest",
+    "TarSdistTest",
 ]
