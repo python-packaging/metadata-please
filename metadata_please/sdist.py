@@ -14,10 +14,10 @@ def from_zip_sdist(zf: ZipFile) -> bytes:
     requires.sort(key=len)
     data = zf.read(requires[0])
     assert data is not None
-    requires, extras = convert_sdist_requires(data.decode("utf-8"))
+    requires_lines, extras = convert_sdist_requires(data.decode("utf-8"))
 
     buf: list[str] = []
-    for req in requires:
+    for req in requires_lines:
         buf.append(f"Requires-Dist: {req}\n")
     for extra in sorted(extras):
         buf.append(f"Provides-Extra: {extra}\n")
@@ -43,10 +43,10 @@ def from_tar_sdist(tf: TarFile) -> bytes:
     fo = tf.extractfile(requires[0])
     assert fo is not None
 
-    requires, extras = convert_sdist_requires(fo.read().decode("utf-8"))
+    requires_lines, extras = convert_sdist_requires(fo.read().decode("utf-8"))
 
     buf: list[str] = []
-    for req in requires:
+    for req in requires_lines:
         buf.append(f"Requires-Dist: {req}\n")
     for extra in sorted(extras):
         buf.append(f"Provides-Extra: {extra}\n")

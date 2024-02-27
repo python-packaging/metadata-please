@@ -11,14 +11,14 @@ class BasicMetadata:
     # Popualted from Requires-Dist or requires.txt
     reqs: Sequence[str]
     # Populated from Provides-Extra
-    provides_extra: set[str]
+    provides_extra: frozenset[str]
 
     @classmethod
     def from_metadata(cls, metadata: bytes) -> BasicMetadata:
         msg = message_from_string(metadata.decode("utf-8"))
         return BasicMetadata(
             msg.get_all("Requires-Dist") or (),
-            set(msg.get_all("Provides-Extra") or ()),
+            frozenset(msg.get_all("Provides-Extra") or ()),
         )
 
     @classmethod
@@ -33,7 +33,7 @@ class BasicMetadata:
         )
 
 
-def convert_sdist_requires(data: str) -> tuple[list[str], set[str]]:
+def convert_sdist_requires(data: str) -> tuple[tuple[str, ...], frozenset[str]]:
     # This is reverse engineered from looking at a couple examples, but there
     # does not appear to be a formal spec.  Mentioned at
     # https://setuptools.readthedocs.io/en/latest/formats.html#requires-txt
@@ -64,4 +64,4 @@ def convert_sdist_requires(data: str) -> tuple[list[str], set[str]]:
                 lst.append(f"{line}; {current_markers}")
             else:
                 lst.append(line)
-    return lst, extras
+    return tuple(lst), frozenset(extras)
