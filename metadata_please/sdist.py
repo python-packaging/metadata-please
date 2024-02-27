@@ -12,12 +12,15 @@ def from_zip_sdist(zf: ZipFile) -> bytes:
     """
     requires = [f for f in zf.namelist() if f.endswith("/requires.txt")]
     requires.sort(key=len)
+    if not requires:
+        return b""
+
     data = zf.read(requires[0])
     assert data is not None
-    requires, extras = convert_sdist_requires(data.decode("utf-8"))
+    requires_lines, extras = convert_sdist_requires(data.decode("utf-8"))
 
     buf: list[str] = []
-    for req in requires:
+    for req in requires_lines:
         buf.append(f"Requires-Dist: {req}\n")
     for extra in sorted(extras):
         buf.append(f"Provides-Extra: {extra}\n")
@@ -27,6 +30,9 @@ def from_zip_sdist(zf: ZipFile) -> bytes:
 def basic_metadata_from_zip_sdist(zf: ZipFile) -> BasicMetadata:
     requires = [f for f in zf.namelist() if f.endswith("/requires.txt")]
     requires.sort(key=len)
+    if not requires:
+        return BasicMetadata((), frozenset())
+
     data = zf.read(requires[0])
     assert data is not None
     return BasicMetadata.from_sdist_pkg_info_and_requires(b"", data)
@@ -39,14 +45,16 @@ def from_tar_sdist(tf: TarFile) -> bytes:
     # XXX Why do ZipFile and TarFile not have a common interface ?!
     requires = [f for f in tf.getnames() if f.endswith("/requires.txt")]
     requires.sort(key=len)
+    if not requires:
+        return b""
 
     fo = tf.extractfile(requires[0])
     assert fo is not None
 
-    requires, extras = convert_sdist_requires(fo.read().decode("utf-8"))
+    requires_lines, extras = convert_sdist_requires(fo.read().decode("utf-8"))
 
     buf: list[str] = []
-    for req in requires:
+    for req in requires_lines:
         buf.append(f"Requires-Dist: {req}\n")
     for extra in sorted(extras):
         buf.append(f"Provides-Extra: {extra}\n")
@@ -57,6 +65,8 @@ def basic_metadata_from_tar_sdist(tf: TarFile) -> BasicMetadata:
     # XXX Why do ZipFile and TarFile not have a common interface ?!
     requires = [f for f in tf.getnames() if f.endswith("/requires.txt")]
     requires.sort(key=len)
+    if not requires:
+        return BasicMetadata((), frozenset())
 
     fo = tf.extractfile(requires[0])
     assert fo is not None
