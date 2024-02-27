@@ -46,6 +46,18 @@ b
         )
         self.assertEqual({"e"}, bm.provides_extra)
 
+    def test_basic_metadata_no_requires_file(self) -> None:
+        z = MemoryZipFile(
+            ["foo.egg-info/PKG-INFO", "foo/__init__.py"],
+            read_value=b"\n",
+        )
+        bm = basic_metadata_from_zip_sdist(z)  # type: ignore
+        self.assertEqual(
+            (),
+            bm.reqs,
+        )
+        self.assertEqual(set(), bm.provides_extra)
+
     def test_basic_metadata_absl_py_09(self) -> None:
         z = MemoryZipFile(
             ["foo.egg-info/requires.txt", "foo/__init__.py"],
