@@ -27,7 +27,7 @@ format:
 lint:
 	python -m ufmt check $(SOURCES)
 	python -m flake8 $(SOURCES)
-	python -m checkdeps --allow-names metadata_please metadata_please
+	python -m checkdeps --allow-names metadata_please,toml metadata_please
 	mypy --strict --install-types --non-interactive metadata_please
 
 .PHONY: release
