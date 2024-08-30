@@ -21,16 +21,25 @@ class SourceCheckoutTest(unittest.TestCase):
             Path(d, "pyproject.toml").write_text(
                 """\
 [project]
-dependencies = ["x"]
+dependencies = ["x", "y ; platform_system != 'Windows'"]
 
 [project.optional-dependencies]
 dev = ["Foo <= 2"]
+marker = ["Bar ; python_version < '3'", "Baz <= 2; python_version < '3'"]
 """
             )
+            rv = basic_metadata_from_source_checkout(Path(d))
             self.assertEqual(
-                BasicMetadata(["x", 'Foo <= 2 ; extra == "dev"'], frozenset(["dev"])),
-                basic_metadata_from_source_checkout(Path(d)),
+                [
+                    "x",
+                    "y ; platform_system != 'Windows'",
+                    'Foo <= 2 ; extra == "dev"',
+                    "Bar ; (python_version < '3') and (extra == \"marker\")",
+                    "Baz <= 2 ; (python_version < '3') and (extra == \"marker\")",
+                ],
+                rv.reqs,
             )
+            self.assertEqual(frozenset({"dev", "marker"}), rv.provides_extra)
 
     def test_poetry_full(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -45,6 +54,8 @@ b2 = "^0.2.3"
 c = "~1.2.3"
 c2 = "~1.2"
 c3 = "~1"
+d = {version="2", python="<3.11"}
+e = {version="2", markers="sys_platform == 'darwin'"}
 skipped = {git = "..."}
 complex = {extras=["bar", "baz"], version="2"}
 opt = { version = "^2.9", optional = true}
@@ -64,6 +75,8 @@ Foo = ["Opt"]  # intentionally uppercased
                     "c>=1.2.3,<1.3",
                     "c2>=1.2,<1.3",
                     "c3>=1,<2",
+                    "d==2 ; python_version < '3.11'",
+                    "e==2 ; sys_platform == 'darwin'",
                     "complex[bar,baz]==2",
                     'opt>=2.9,<3 ; extra == "foo"',
                 ],
@@ -98,17 +111,21 @@ dev =
     # comment after
 marker =
     Bar ; python_version < "3"
+    Baz <= 2; python_version < "3"
 """
             )
+            rv = basic_metadata_from_source_checkout(Path(d))
             self.assertEqual(
-                BasicMetadata(
-                    [
-                        "x",
-                        "y",
-                        'Foo <= 2 ; extra == "dev"',
-                        'Bar ; (python_version < "3") and extra == "marker"',
-                    ],
-                    frozenset(["dev", "marker"]),
-                ),
-                basic_metadata_from_source_checkout(Path(d)),
+                [
+                    "x",
+                    "y",
+                    'Foo <= 2 ; extra == "dev"',
+                    'Bar ; (python_version < "3") and (extra == "marker")',
+                    'Baz <= 2 ; (python_version < "3") and (extra == "marker")',
+                ],
+                rv.reqs,
+            )
+            self.assertEqual(
+                frozenset({"dev", "marker"}),
+                rv.provides_extra,
             )

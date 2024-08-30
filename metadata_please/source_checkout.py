@@ -10,7 +10,7 @@ Prefers:
 
 Notably, does not read setup.py or attempt to emulate anything that can't be read staticly.
 """
-
+import re
 from pathlib import Path
 
 try:
@@ -24,8 +24,20 @@ from packaging.utils import canonicalize_name
 
 from .types import BasicMetadata
 
+OPERATOR_RE = re.compile(r"([<>=~]+)(\d.*)")
 
-def merge_markers(extra_name: str, value: str) -> str:
+
+def combine_markers(*markers: str) -> str:
+    filtered_markers = [m for m in markers if m and m.strip()]
+    if len(filtered_markers) == 0:
+        return ""
+    elif len(filtered_markers) == 1:
+        return filtered_markers[0]
+    else:
+        return " and ".join(f"({m})" for m in filtered_markers)
+
+
+def merge_extra_marker(extra_name: str, value: str) -> str:
     """Simulates what a dist-info requirement string would look like if also restricted to an extra."""
     if ";" not in value:
         return f'{value} ; extra == "{extra_name}"'
@@ -33,7 +45,8 @@ def merge_markers(extra_name: str, value: str) -> str:
         a, _, b = value.partition(";")
         a = a.strip()
         b = b.strip()
-        return f'{a} ; ({b}) and extra == "{extra_name}"'
+        c = f'extra == "{extra_name}"'
+        return f"{a} ; {combine_markers(b, c)}"
 
 
 def from_source_checkout(path: Path) -> bytes:
@@ -61,7 +74,7 @@ def from_pep621_checkout(path: Path) -> bytes:
         extra_name = canonicalize_name(k)
         buf.append(f"Provides-Extra: {extra_name}\n")
         for i in v:
-            buf.append("Requires-Dist: " + merge_markers(extra_name, i) + "\n")
+            buf.append("Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n")
 
     return "".join(buf).encode("utf-8")
 
@@ -127,10 +140,21 @@ def from_poetry_checkout(path: Path) -> bytes:
                     extras = "[%s]" % (",".join(v["extras"]))
                 else:
                     extras = ""
+                markers = v.get("markers", "")
+                python = v.get("python", "")
+                if python:
+                    m = OPERATOR_RE.fullmatch(python)
+                    assert m is not None
+                    # TODO do ^/~ work on python version?
+                    python = f"python_version {m.group(1)} '{m.group(2)}'"
+                markers = combine_markers(markers, python)
+                if markers:
+                    markers = " ; " + markers
                 optional = v.get("optional", False)
             else:
                 version = v
                 extras = ""
+                markers = ""
                 optional = False
 
             if not version:
@@ -150,17 +174,18 @@ def from_poetry_checkout(path: Path) -> bytes:
                 version = "==" + version
 
             if optional:
-                saved_extra_constraints[k] = f"{extras}{version}"
+                saved_extra_constraints[k] = (f"{extras}{version}", markers)
             else:
-                buf.append(f"Requires-Dist: {k}{extras}{version}\n")
+                buf.append(f"Requires-Dist: {k}{extras}{version}{markers}\n")
 
     for k, v in doc.get("tool", {}).get("poetry", {}).get("extras", {}).items():
         k = canonicalize_name(k)
         buf.append(f"Provides-Extra: {k}\n")
         for vi in v:
             vi = canonicalize_name(vi)
+            constraints, markers = saved_extra_constraints[vi]
             buf.append(
-                f"Requires-Dist: {vi}{merge_markers(k, saved_extra_constraints[vi])}"
+                f"Requires-Dist: {vi}{constraints}{merge_extra_marker(k, markers)}"
             )
 
     return "".join(buf).encode("utf-8")
@@ -195,7 +220,9 @@ def from_setup_cfg_checkout(path: Path) -> bytes:
             for i in v.splitlines():
                 i = i.strip()
                 if i:
-                    buf.append("Requires-Dist: " + merge_markers(extra_name, i) + "\n")
+                    buf.append(
+                        "Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n"
+                    )
 
     return "".join(buf).encode("utf-8")
 
