@@ -7,9 +7,11 @@ Prefers:
 - PEP 621 metadata (pyproject.toml)
 - Poetry metadata (pyproject.toml)
 - Setuptools static metadata (setup.cfg)
+- Setuptools, low effort reading (setup.py)
 
-Notably, does not read setup.py or attempt to emulate anything that can't be read staticly.
+Notably, does not read nontrivial setup.py or attempt to emulate anything that can't be read staticly.
 """
+import ast
 import re
 from pathlib import Path
 
@@ -21,6 +23,8 @@ except ImportError:
 from configparser import NoOptionError, NoSectionError, RawConfigParser
 
 from packaging.utils import canonicalize_name
+
+from .source_checkout_ast import SetupFindingVisitor, UNKNOWN
 
 from .types import BasicMetadata
 
@@ -54,6 +58,7 @@ def from_source_checkout(path: Path) -> bytes:
         from_pep621_checkout(path)
         or from_poetry_checkout(path)
         or from_setup_cfg_checkout(path)
+        or from_setup_py_checkout(path)
     )
 
 
@@ -223,6 +228,36 @@ def from_setup_cfg_checkout(path: Path) -> bytes:
                     buf.append(
                         "Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n"
                     )
+
+    return "".join(buf).encode("utf-8")
+
+
+def from_setup_py_checkout(path: Path) -> bytes:
+    try:
+        data = (path / "setup.py").read_bytes()
+    except FileNotFoundError:
+        return b""
+
+    v = SetupFindingVisitor()
+    v.visit(ast.parse(data))
+
+    if not v.setup_call_args:
+        return b""
+
+    buf = []
+    if r := v.setup_call_args.get("install_requires"):
+        if r is UNKNOWN:
+            raise ValueError("Complex setup call can't extract reqs")
+        for dep in r:
+            buf.append(f"Requires-Dist: {dep}\n")
+    if er := v.setup_call_args.get("extras_require"):
+        if er is UNKNOWN:
+            raise ValueError("Complex setup call can't extract extras")
+        for k, deps in er.items():
+            extra_name = canonicalize_name(k)
+            buf.append(f"Provides-Extra: {extra_name}\n")
+            for i in deps:
+                buf.append("Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n")
 
     return "".join(buf).encode("utf-8")
 
