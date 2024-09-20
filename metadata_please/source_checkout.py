@@ -245,12 +245,15 @@ def from_setup_py_checkout(path: Path) -> bytes:
         return b""
 
     buf = []
-    if r := v.setup_call_args.get("install_requires"):
+
+    r = v.setup_call_args.get("install_requires")
+    if r:
         if r is UNKNOWN:
             raise ValueError("Complex setup call can't extract reqs")
         for dep in r:
             buf.append(f"Requires-Dist: {dep}\n")
-    if er := v.setup_call_args.get("extras_require"):
+    er = v.setup_call_args.get("extras_require")
+    if er:
         if er is UNKNOWN:
             raise ValueError("Complex setup call can't extract extras")
         for k, deps in er.items():
