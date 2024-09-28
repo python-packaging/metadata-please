@@ -95,6 +95,40 @@ Foo = ["Opt"]  # intentionally uppercased
                 basic_metadata_from_source_checkout(Path(d)),
             )
 
+    def test_setuppy_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "setup.py").write_text("")
+            self.assertEqual(
+                BasicMetadata((), frozenset()),
+                basic_metadata_from_source_checkout(Path(d)),
+            )
+
+    def test_setuppy_trivial(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "setup.py").write_text("from setuptools import setup; setup()")
+            self.assertEqual(
+                BasicMetadata((), frozenset()),
+                basic_metadata_from_source_checkout(Path(d)),
+            )
+
+    def test_setuppy(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "setup.py").write_text(
+                "import setuptools; setuptools.setup(install_requires=['a'], extras_require={'b': ['c']})"
+            )
+            self.assertEqual(
+                BasicMetadata(["a", 'c ; extra == "b"'], frozenset("b")),
+                basic_metadata_from_source_checkout(Path(d)),
+            )
+
+    def test_setuppy_toocomplex(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "setup.py").write_text(
+                "from setuptools import setup; setup(install_requires=blarg)"
+            )
+            with self.assertRaises(ValueError):
+                basic_metadata_from_source_checkout(Path(d))
+
     def test_setuptools_extras(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             Path(d, "setup.cfg").write_text(
