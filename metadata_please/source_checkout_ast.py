@@ -11,6 +11,7 @@ coverage of open source
 """
 
 import ast
+from typing import Any, Dict, Optional
 
 
 # Copied from orig-index
@@ -21,14 +22,14 @@ class ShortCircuitingVisitor(ast.NodeVisitor):
     visiting of children is not the responsibility of the visit_ method.
     """
 
-    def visit(self, node):
+    def visit(self, node: ast.AST) -> None:
         method = "visit_" + node.__class__.__name__
         visitor = getattr(self, method, self.generic_visit)
         rv = visitor(node)
         if rv:
             self.visit_children(node)
 
-    def visit_children(self, node):
+    def visit_children(self, node: ast.AST) -> None:
         for field, value in ast.iter_fields(node):
             if isinstance(value, list):
                 for item in value:
@@ -37,16 +38,16 @@ class ShortCircuitingVisitor(ast.NodeVisitor):
             elif isinstance(value, ast.AST):
                 self.visit(value)
 
-    def generic_visit(self, node) -> bool:
+    def generic_visit(self, node: ast.AST) -> bool:
         return True
 
 
 class QualifiedNameSaver(ShortCircuitingVisitor):
     """Similar to LibCST's QualifiedNameProvider except simpler and wronger"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.qualified_name_prefixes = {}
+        self.qualified_name_prefixes: Dict[str, str] = {}
 
     def qualified_name(self, node: ast.AST) -> str:
         if isinstance(node, ast.Attribute):
@@ -54,19 +55,20 @@ class QualifiedNameSaver(ShortCircuitingVisitor):
         elif isinstance(node, ast.Expr):
             return self.qualified_name(node.value)
         elif isinstance(node, ast.Name):
-            if new := self.qualified_name_prefixes.get(node.id):
+            new = self.qualified_name_prefixes.get(node.id)
+            if new:
                 return new
             return f"<locals>.{node.id}"
         else:
             raise ValueError(f"Complex expression: {type(node)}")
 
-    def visit_Import(self, node: ast.Import):
+    def visit_Import(self, node: ast.Import) -> None:
         # .names
         #     alias = (identifier name, identifier? asname)
         for a in node.names:
             self.qualified_name_prefixes[a.asname or a.name] = a.name
 
-    def visit_ImportFrom(self, node: ast.ImportFrom):
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         # .identifier / .level
         # .names
         #     alias = (identifier name, identifier? asname)
@@ -87,12 +89,12 @@ UNKNOWN = Unknown()
 
 
 class SetupFindingVisitor(QualifiedNameSaver):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.setup_call_args = None
-        self.setup_call_kwargs = None
+        self.setup_call_args: Optional[Dict[str, Any]] = None
+        self.setup_call_kwargs: Optional[bool] = None
 
-    def visit_Call(self, node):
+    def visit_Call(self, node: ast.Call) -> None:
         # .func (expr, can just be name)
         # .args
         # .keywords
