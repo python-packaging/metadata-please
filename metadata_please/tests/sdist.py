@@ -13,12 +13,14 @@ from ._zip import MemoryZipFile
 class ZipSdistTest(unittest.TestCase):
     def test_requires_as_expected(self) -> None:
         z = MemoryZipFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
-            read_value=b"""\
+            {
+                "foo/__init__.py": b"",
+                "foo.egg-info/requires.txt": b"""\
 a
 [e]
 b
 """,
+            }
         )
         metadata = from_zip_sdist(z)  # type: ignore
         self.assertEqual(
@@ -32,12 +34,14 @@ Provides-Extra: e
 
     def test_basic_metadata(self) -> None:
         z = MemoryZipFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
-            read_value=b"""\
+            {
+                "foo/__init__.py": b"",
+                "foo.egg-info/requires.txt": b"""\
 a
 [e]
 b
 """,
+            }
         )
         bm = basic_metadata_from_zip_sdist(z)  # type: ignore
         self.assertEqual(
@@ -48,8 +52,10 @@ b
 
     def test_basic_metadata_no_requires_file(self) -> None:
         z = MemoryZipFile(
-            ["foo.egg-info/PKG-INFO", "foo/__init__.py"],
-            read_value=b"\n",
+            {
+                "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
+            },
         )
         bm = basic_metadata_from_zip_sdist(z)  # type: ignore
         self.assertEqual(
@@ -60,8 +66,9 @@ b
 
     def test_basic_metadata_absl_py_09(self) -> None:
         z = MemoryZipFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
-            read_value=b"""\
+            {
+                "foo/__init__.py": b"",
+                "foo.egg-info/requires.txt": b"""\
 six
 
 [:python_version < "3.4"]
@@ -69,6 +76,7 @@ enum34
 [test:python_version < "3.4"]
 pytest
 """,
+            }
         )
         bm = basic_metadata_from_zip_sdist(z)  # type: ignore
         self.assertEqual(

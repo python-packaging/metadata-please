@@ -31,7 +31,7 @@ def basic_metadata_from_zip_sdist(zf: ZipFile) -> BasicMetadata:
     requires = [f for f in zf.namelist() if f.endswith("/requires.txt")]
     requires.sort(key=len)
     if not requires:
-        return BasicMetadata((), frozenset())
+        return BasicMetadata((), frozenset(), "-")
 
     data = zf.read(requires[0])
     assert data is not None
