@@ -36,7 +36,13 @@ def basic_metadata_from_zip_sdist(zf: ZipFile) -> BasicMetadata:
     else:
         requires_data = b""
 
-    pkg_info = next(f for f in zf.namelist() if f.endswith("/PKG-INFO"))
+    # Find the PKG-INFO file with the shortest path. This is to avoid picking up
+    # a PKG-INFO file from a nested test directory.
+    pkg_info = sorted(
+        (f for f in zf.namelist() if f == "PKG-INFO" or f.endswith("/PKG-INFO")),
+        key=len,
+    )[0]
+
     pkg_info_data = zf.read(pkg_info)
     assert pkg_info_data is not None
 
@@ -74,14 +80,20 @@ def basic_metadata_from_tar_sdist(tf: TarFile) -> BasicMetadata:
     if requires:
         requires_fo = tf.extractfile(requires[0])
         assert requires_fo is not None
+        requires_data = requires_fo.read()
     else:
-        requires_fo = b""
+        requires_data = b""
 
-    pkg_info = next(f for f in tf.getnames() if f.endswith("/PKG-INFO"))
+    # Find the PKG-INFO file with the shortest path. This is to avoid picking up
+    # a PKG-INFO file from a nested test directory.
+    pkg_info = sorted(
+        (f for f in tf.getnames() if f == "PKG-INFO" or f.endswith("/PKG-INFO")),
+        key=len,
+    )[0]
 
     pkg_info_fo = tf.extractfile(pkg_info)
     assert pkg_info_fo is not None
 
     return BasicMetadata.from_sdist_pkg_info_and_requires(
-        pkg_info_fo.read(), requires_fo and requires_fo.read()
+        pkg_info_fo.read(), requires_data
     )

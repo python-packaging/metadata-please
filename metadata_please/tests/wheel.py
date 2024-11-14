@@ -1,7 +1,8 @@
 import unittest
 
-from ..wheel import basic_metadata_from_wheel, from_wheel, InvalidWheel
+from ..wheel import InvalidWheel, basic_metadata_from_wheel, from_wheel
 from ._zip import MemoryZipFile
+from .metadata_contents import METADATA_CONTENTS
 
 
 class WheelTest(unittest.TestCase):
@@ -58,7 +59,7 @@ class WheelTest(unittest.TestCase):
     def test_basic_metadata_more_fields(self) -> None:
         z = MemoryZipFile(
             {
-                "foo.dist-info/METADATA": b"Requires-Dist: foo\nVersion: 1.2.58\nSummary: Some Summary\nHome-page: http://example.com\nAuthor: Chicken\nAuthor-email: duck@example.com\nKeywords: farm,animals\nRequires-Python: >=3.6\nDescription-Content-Type: text/markdown",
+                "foo.dist-info/METADATA": METADATA_CONTENTS,
                 "foo/__init__.py": b"",
             }
         )
@@ -71,4 +72,4 @@ class WheelTest(unittest.TestCase):
         self.assertEqual("duck@example.com", bm.author_email)
         self.assertEqual("farm,animals", bm.keywords)
         self.assertEqual("text/markdown", bm.long_description_content_type)
-        self.assertEqual(None, bm.description)
+        self.assertEqual("# Foo\n\nA very important package.\n", bm.description)

@@ -8,6 +8,7 @@ from ..sdist import (
 )
 from ._tar import MemoryTarFile
 from ._zip import MemoryZipFile
+from .metadata_contents import METADATA_CONTENTS
 
 
 class ZipSdistTest(unittest.TestCase):
@@ -94,10 +95,13 @@ pytest
         self.assertEqual({"test"}, bm.provides_extra)
 
     def test_basic_metadata_fields(self) -> None:
+        """
+        Modern setuptools will drop a PKG-INFO file in a sdist that is very similar to the METADATA file in a wheel.
+        """
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
-                "foo.egg-info/PKG-INFO": b"Requires-Dist: foo\nVersion: 1.2.58\nSummary: Some Summary\nHome-page: http://example.com\nAuthor: Chicken\nAuthor-email: duck@example.com\nKeywords: farm,animals\nRequires-Python: >=3.6\nDescription-Content-Type: text/markdown",
+                "PKG-INFO": METADATA_CONTENTS,
             }
         )
         bm = basic_metadata_from_zip_sdist(z)  # type: ignore
@@ -109,7 +113,7 @@ pytest
         self.assertEqual("duck@example.com", bm.author_email)
         self.assertEqual("farm,animals", bm.keywords)
         self.assertEqual("text/markdown", bm.long_description_content_type)
-        self.assertEqual(None, bm.description)
+        self.assertEqual("# Foo\n\nA very important package.\n", bm.description)
 
 
 class TarSdistTest(unittest.TestCase):
@@ -150,8 +154,8 @@ b
 
     def test_metadata_fields_from_tar_sdist(self) -> None:
         t = MemoryTarFile(
-            ["foo.egg-info/PKG-INFO", "foo/__init__.py"],
-            read_value=b"""Requires-Dist: foo\nVersion: 1.2.58\nSummary: Some Summary\nHome-page: http://example.com\nAuthor: Chicken\nAuthor-email: duck@example.com\nKeywords: farm,animals\nRequires-Python: >=3.6\nDescription-Content-Type: text/markdown\n""",
+            ["PKG-INFO", "foo/__init__.py"],
+            read_value=METADATA_CONTENTS,
         )
         bm = basic_metadata_from_tar_sdist(t)  # type: ignore
         self.assertEqual("1.2.58", bm.version)
@@ -161,4 +165,4 @@ b
         self.assertEqual("duck@example.com", bm.author_email)
         self.assertEqual("farm,animals", bm.keywords)
         self.assertEqual("text/markdown", bm.long_description_content_type)
-        self.assertEqual(None, bm.description)
+        self.assertEqual("# Foo\n\nA very important package.\n", bm.description)
