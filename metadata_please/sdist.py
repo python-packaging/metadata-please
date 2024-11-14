@@ -30,12 +30,23 @@ def from_zip_sdist(zf: ZipFile) -> bytes:
 def basic_metadata_from_zip_sdist(zf: ZipFile) -> BasicMetadata:
     requires = [f for f in zf.namelist() if f.endswith("/requires.txt")]
     requires.sort(key=len)
-    if not requires:
-        return BasicMetadata((), frozenset(), "-")
+    if requires:
+        requires_data = zf.read(requires[0])
+        assert requires_data is not None
+    else:
+        requires_data = b""
 
-    data = zf.read(requires[0])
-    assert data is not None
-    return BasicMetadata.from_sdist_pkg_info_and_requires(b"", data)
+    # Find the PKG-INFO file with the shortest path. This is to avoid picking up
+    # a PKG-INFO file from a nested test directory.
+    pkg_info = sorted(
+        (f for f in zf.namelist() if f == "PKG-INFO" or f.endswith("/PKG-INFO")),
+        key=len,
+    )[0]
+
+    pkg_info_data = zf.read(pkg_info)
+    assert pkg_info_data is not None
+
+    return BasicMetadata.from_sdist_pkg_info_and_requires(pkg_info_data, requires_data)
 
 
 def from_tar_sdist(tf: TarFile) -> bytes:
@@ -58,6 +69,7 @@ def from_tar_sdist(tf: TarFile) -> bytes:
         buf.append(f"Requires-Dist: {req}\n")
     for extra in sorted(extras):
         buf.append(f"Provides-Extra: {extra}\n")
+
     return ("".join(buf)).encode("utf-8")
 
 
@@ -65,10 +77,23 @@ def basic_metadata_from_tar_sdist(tf: TarFile) -> BasicMetadata:
     # XXX Why do ZipFile and TarFile not have a common interface ?!
     requires = [f for f in tf.getnames() if f.endswith("/requires.txt")]
     requires.sort(key=len)
-    if not requires:
-        return BasicMetadata((), frozenset())
+    if requires:
+        requires_fo = tf.extractfile(requires[0])
+        assert requires_fo is not None
+        requires_data = requires_fo.read()
+    else:
+        requires_data = b""
 
-    fo = tf.extractfile(requires[0])
-    assert fo is not None
+    # Find the PKG-INFO file with the shortest path. This is to avoid picking up
+    # a PKG-INFO file from a nested test directory.
+    pkg_info = sorted(
+        (f for f in tf.getnames() if f == "PKG-INFO" or f.endswith("/PKG-INFO")),
+        key=len,
+    )[0]
 
-    return BasicMetadata.from_sdist_pkg_info_and_requires(b"", fo.read())
+    pkg_info_fo = tf.extractfile(pkg_info)
+    assert pkg_info_fo is not None
+
+    return BasicMetadata.from_sdist_pkg_info_and_requires(
+        pkg_info_fo.read(), requires_data
+    )

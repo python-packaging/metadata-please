@@ -8,6 +8,7 @@ from ..sdist import (
 )
 from ._tar import MemoryTarFile
 from ._zip import MemoryZipFile
+from .metadata_contents import METADATA_CONTENTS
 
 
 class ZipSdistTest(unittest.TestCase):
@@ -15,6 +16,7 @@ class ZipSdistTest(unittest.TestCase):
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
                 "foo.egg-info/requires.txt": b"""\
 a
 [e]
@@ -36,6 +38,7 @@ Provides-Extra: e
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
                 "foo.egg-info/requires.txt": b"""\
 a
 [e]
@@ -68,6 +71,7 @@ b
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
                 "foo.egg-info/requires.txt": b"""\
 six
 
@@ -90,11 +94,32 @@ pytest
         )
         self.assertEqual({"test"}, bm.provides_extra)
 
+    def test_basic_metadata_fields(self) -> None:
+        """
+        Modern setuptools will drop a PKG-INFO file in a sdist that is very similar to the METADATA file in a wheel.
+        """
+        z = MemoryZipFile(
+            {
+                "foo/__init__.py": b"",
+                "PKG-INFO": METADATA_CONTENTS,
+            }
+        )
+        bm = basic_metadata_from_zip_sdist(z)  # type: ignore
+        self.assertEqual(["foo"], bm.reqs)
+        self.assertEqual("1.2.58", bm.version)
+        self.assertEqual("Some Summary", bm.summary)
+        self.assertEqual("http://example.com", bm.url)
+        self.assertEqual("Chicken", bm.author)
+        self.assertEqual("duck@example.com", bm.author_email)
+        self.assertEqual("farm,animals", bm.keywords)
+        self.assertEqual("text/markdown", bm.long_description_content_type)
+        self.assertEqual("# Foo\n\nA very important package.\n", bm.description)
+
 
 class TarSdistTest(unittest.TestCase):
     def test_requires_as_expected(self) -> None:
         t = MemoryTarFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
+            ["foo.egg-info/PKG-INFO", "foo.egg-info/requires.txt", "foo/__init__.py"],
             read_value=b"""\
 a
 [e]
@@ -113,7 +138,7 @@ Provides-Extra: e
 
     def test_basic_metadata(self) -> None:
         t = MemoryTarFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
+            ["foo.egg-info/PKG-INFO", "foo.egg-info/requires.txt", "foo/__init__.py"],
             read_value=b"""\
 a
 [e]
@@ -126,3 +151,18 @@ b
             bm.reqs,
         )
         self.assertEqual({"e"}, bm.provides_extra)
+
+    def test_metadata_fields_from_tar_sdist(self) -> None:
+        t = MemoryTarFile(
+            ["PKG-INFO", "foo/__init__.py"],
+            read_value=METADATA_CONTENTS,
+        )
+        bm = basic_metadata_from_tar_sdist(t)  # type: ignore
+        self.assertEqual("1.2.58", bm.version)
+        self.assertEqual("Some Summary", bm.summary)
+        self.assertEqual("http://example.com", bm.url)
+        self.assertEqual("Chicken", bm.author)
+        self.assertEqual("duck@example.com", bm.author_email)
+        self.assertEqual("farm,animals", bm.keywords)
+        self.assertEqual("text/markdown", bm.long_description_content_type)
+        self.assertEqual("# Foo\n\nA very important package.\n", bm.description)
