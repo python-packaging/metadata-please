@@ -367,8 +367,6 @@ def from_setup_cfg_checkout(path: Path) -> bytes:
                         "Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n"
                     )
 
-    # TODO name requires_python url project_urls
-
     return "".join(buf).encode("utf-8")
 
 
