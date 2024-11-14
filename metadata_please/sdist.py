@@ -30,11 +30,11 @@ def from_zip_sdist(zf: ZipFile) -> bytes:
 def basic_metadata_from_zip_sdist(zf: ZipFile) -> BasicMetadata:
     requires = [f for f in zf.namelist() if f.endswith("/requires.txt")]
     requires.sort(key=len)
-    if not requires:
-        return BasicMetadata((), frozenset(), "-")
-
-    requires_data = zf.read(requires[0])
-    assert requires_data is not None
+    if requires:
+        requires_data = zf.read(requires[0])
+        assert requires_data is not None
+    else:
+        requires_data = b""
 
     pkg_info = next(f for f in zf.namelist() if f.endswith("/PKG-INFO"))
     pkg_info_data = zf.read(pkg_info)
@@ -71,11 +71,11 @@ def basic_metadata_from_tar_sdist(tf: TarFile) -> BasicMetadata:
     # XXX Why do ZipFile and TarFile not have a common interface ?!
     requires = [f for f in tf.getnames() if f.endswith("/requires.txt")]
     requires.sort(key=len)
-    if not requires:
-        return BasicMetadata((), frozenset())
-
-    requires_fo = tf.extractfile(requires[0])
-    assert requires_fo is not None
+    if requires:
+        requires_fo = tf.extractfile(requires[0])
+        assert requires_fo is not None
+    else:
+        requires_fo = b""
 
     pkg_info = next(f for f in tf.getnames() if f.endswith("/PKG-INFO"))
 
@@ -83,5 +83,5 @@ def basic_metadata_from_tar_sdist(tf: TarFile) -> BasicMetadata:
     assert pkg_info_fo is not None
 
     return BasicMetadata.from_sdist_pkg_info_and_requires(
-        pkg_info_fo.read(), requires_fo.read()
+        pkg_info_fo.read(), requires_fo and requires_fo.read()
     )

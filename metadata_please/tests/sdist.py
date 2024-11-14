@@ -15,6 +15,7 @@ class ZipSdistTest(unittest.TestCase):
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
                 "foo.egg-info/requires.txt": b"""\
 a
 [e]
@@ -36,6 +37,7 @@ Provides-Extra: e
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
                 "foo.egg-info/requires.txt": b"""\
 a
 [e]
@@ -68,6 +70,7 @@ b
         z = MemoryZipFile(
             {
                 "foo/__init__.py": b"",
+                "foo.egg-info/PKG-INFO": b"\n",
                 "foo.egg-info/requires.txt": b"""\
 six
 
@@ -94,7 +97,7 @@ pytest
 class TarSdistTest(unittest.TestCase):
     def test_requires_as_expected(self) -> None:
         t = MemoryTarFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
+            ["foo.egg-info/PKG-INFO", "foo.egg-info/requires.txt", "foo/__init__.py"],
             read_value=b"""\
 a
 [e]
@@ -113,7 +116,7 @@ Provides-Extra: e
 
     def test_basic_metadata(self) -> None:
         t = MemoryTarFile(
-            ["foo.egg-info/requires.txt", "foo/__init__.py"],
+            ["foo.egg-info/PKG-INFO", "foo.egg-info/requires.txt", "foo/__init__.py"],
             read_value=b"""\
 a
 [e]
@@ -126,3 +129,18 @@ b
             bm.reqs,
         )
         self.assertEqual({"e"}, bm.provides_extra)
+
+    def test_metadata_fields_from_tar_sdist(self) -> None:
+        t = MemoryTarFile(
+            ["foo.egg-info/PKG-INFO", "foo/__init__.py"],
+            read_value=b"""Requires-Dist: foo\nVersion: 1.2.58\nSummary: Some Summary\nHome-page: http://example.com\nAuthor: Chicken\nAuthor-email: duck@example.com\nKeywords: farm,animals\nRequires-Python: >=3.6\nDescription-Content-Type: text/markdown\n""",
+        )
+        bm = basic_metadata_from_tar_sdist(t)  # type: ignore
+        self.assertEqual("1.2.58", bm.version)
+        self.assertEqual("Some Summary", bm.summary)
+        self.assertEqual("http://example.com", bm.url)
+        self.assertEqual("Chicken", bm.author)
+        self.assertEqual("duck@example.com", bm.author_email)
+        self.assertEqual("farm,animals", bm.keywords)
+        self.assertEqual("text/markdown", bm.long_description_content_type)
+        self.assertEqual(None, bm.description)
