@@ -1,6 +1,6 @@
 import unittest
 
-from ..wheel import InvalidWheel, basic_metadata_from_wheel, from_wheel
+from ..wheel import basic_metadata_from_wheel, from_wheel, InvalidWheel
 from ._zip import MemoryZipFile
 from .metadata_contents import METADATA_CONTENTS
 
