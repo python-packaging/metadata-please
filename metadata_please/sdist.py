@@ -33,9 +33,14 @@ def basic_metadata_from_zip_sdist(zf: ZipFile) -> BasicMetadata:
     if not requires:
         return BasicMetadata((), frozenset(), "-")
 
-    data = zf.read(requires[0])
-    assert data is not None
-    return BasicMetadata.from_sdist_pkg_info_and_requires(b"", data)
+    requires_data = zf.read(requires[0])
+    assert requires_data is not None
+
+    pkg_info = next(f for f in zf.namelist() if f.endswith("/PKG-INFO"))
+    pkg_info_data = zf.read(pkg_info)
+    assert pkg_info_data is not None
+
+    return BasicMetadata.from_sdist_pkg_info_and_requires(pkg_info_data, requires_data)
 
 
 def from_tar_sdist(tf: TarFile) -> bytes:
@@ -58,6 +63,7 @@ def from_tar_sdist(tf: TarFile) -> bytes:
         buf.append(f"Requires-Dist: {req}\n")
     for extra in sorted(extras):
         buf.append(f"Provides-Extra: {extra}\n")
+
     return ("".join(buf)).encode("utf-8")
 
 
@@ -68,7 +74,14 @@ def basic_metadata_from_tar_sdist(tf: TarFile) -> BasicMetadata:
     if not requires:
         return BasicMetadata((), frozenset())
 
-    fo = tf.extractfile(requires[0])
-    assert fo is not None
+    requires_fo = tf.extractfile(requires[0])
+    assert requires_fo is not None
 
-    return BasicMetadata.from_sdist_pkg_info_and_requires(b"", fo.read())
+    pkg_info = next(f for f in tf.getnames() if f.endswith("/PKG-INFO"))
+
+    pkg_info_fo = tf.extractfile(pkg_info)
+    assert pkg_info_fo is not None
+
+    return BasicMetadata.from_sdist_pkg_info_and_requires(
+        pkg_info_fo.read(), requires_fo.read()
+    )
