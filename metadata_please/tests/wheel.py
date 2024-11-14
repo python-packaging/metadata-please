@@ -6,22 +6,29 @@ from ._zip import MemoryZipFile
 
 class WheelTest(unittest.TestCase):
     def test_well_behaved(self) -> None:
-        z = MemoryZipFile(["foo.dist-info/METADATA", "foo/__init__.py"])
-        self.assertEqual(b"foo", from_wheel(z, "foo"))  # type: ignore
+        z = MemoryZipFile(
+            {
+                "foo.dist-info/METADATA": b"MD",
+                "foo/__init__.py": b"",
+            }
+        )
+        self.assertEqual(b"MD", from_wheel(z, "foo"))  # type: ignore
         self.assertEqual(["foo.dist-info/METADATA"], z.files_read)
 
     def test_actually_empty(self) -> None:
-        z = MemoryZipFile([])
+        z = MemoryZipFile({})
         with self.assertRaisesRegex(InvalidWheel, "Zero .dist-info dirs in wheel"):
             from_wheel(z, "foo")  # type: ignore
 
     def test_no_dist_info(self) -> None:
-        z = MemoryZipFile(["foo/__init__.py"])
+        z = MemoryZipFile({"foo/__init__.py": b""})
         with self.assertRaisesRegex(InvalidWheel, "Zero .dist-info dirs in wheel"):
             from_wheel(z, "foo")  # type: ignore
 
     def test_too_many_dist_info(self) -> None:
-        z = MemoryZipFile(["foo.dist-info/METADATA", "bar.dist-info/METADATA"])
+        z = MemoryZipFile(
+            {"foo.dist-info/METADATA": b"", "bar.dist-info/METADATA": b""}
+        )
         with self.assertRaisesRegex(
             InvalidWheel,
             r"2 .dist-info dirs where there should be just one: \['bar.dist-info', 'foo.dist-info'\]",
@@ -29,14 +36,39 @@ class WheelTest(unittest.TestCase):
             from_wheel(z, "foo")  # type: ignore
 
     def test_bad_project_name(self) -> None:
-        z = MemoryZipFile(["foo.dist-info/METADATA", "foo/__init__.py"])
+        z = MemoryZipFile(
+            {
+                "foo.dist-info/METADATA": b"",
+                "foo/__init__.py": b"",
+            }
+        )
         with self.assertRaisesRegex(InvalidWheel, "Mismatched foo.dist-info for bar"):
             from_wheel(z, "bar")  # type: ignore
 
     def test_basic_metadata(self) -> None:
         z = MemoryZipFile(
-            ["foo.dist-info/METADATA", "foo/__init__.py"],
-            read_value=b"Requires-Dist: foo\n",
+            {
+                "foo.dist-info/METADATA": b"Requires-Dist: foo\n",
+                "foo/__init__.py": b"",
+            }
         )
         bm = basic_metadata_from_wheel(z, "foo")  # type: ignore
         self.assertEqual(["foo"], bm.reqs)
+
+    def test_basic_metadata_more_fields(self) -> None:
+        z = MemoryZipFile(
+            {
+                "foo.dist-info/METADATA": b"Requires-Dist: foo\nVersion: 1.2.58\nSummary: Some Summary\nHome-page: http://example.com\nAuthor: Chicken\nAuthor-email: duck@example.com\nKeywords: farm,animals\nRequires-Python: >=3.6\nDescription-Content-Type: text/markdown",
+                "foo/__init__.py": b"",
+            }
+        )
+        bm = basic_metadata_from_wheel(z, "foo")  # type: ignore
+        self.assertEqual(["foo"], bm.reqs)
+        self.assertEqual("1.2.58", bm.version)
+        self.assertEqual("Some Summary", bm.summary)
+        self.assertEqual("http://example.com", bm.url)
+        self.assertEqual("Chicken", bm.author)
+        self.assertEqual("duck@example.com", bm.author_email)
+        self.assertEqual("farm,animals", bm.keywords)
+        self.assertEqual("text/markdown", bm.long_description_content_type)
+        self.assertEqual(None, bm.description)

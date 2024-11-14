@@ -11,10 +11,38 @@ class SourceCheckoutTest(unittest.TestCase):
     def test_pep621_empty(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             Path(d, "pyproject.toml").write_text("")
-            self.assertEqual(
-                BasicMetadata((), frozenset()),
-                basic_metadata_from_source_checkout(Path(d)),
+            result = basic_metadata_from_source_checkout(Path(d))
+            self.assertEqual(BasicMetadata(), result)
+
+    def test_pep621_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "pyproject.toml").write_text(
+                """\
+[project]
+name = "somepkg"
+version = "1.2.58"
+description = "Example Summary"
+readme = "README.md"
+requires-python = ">=3.7"
+authors = [
+    {name = "chicken", email = "duck@example.com"}
+]
+keywords = ["farm", "animals"]
+urls = { "homepage" = "https://example.com" }
+"""
             )
+            rv = basic_metadata_from_source_checkout(Path(d))
+            self.assertEqual("somepkg", rv.name)
+            self.assertEqual("1.2.58", rv.version)
+            self.assertEqual("Example Summary", rv.summary)
+            self.assertEqual(None, rv.url)
+            self.assertEqual({"homepage": "https://example.com"}, rv.project_urls)
+            self.assertEqual("chicken", rv.author)
+            self.assertEqual("duck@example.com", rv.author_email)
+            self.assertEqual("['farm', 'animals']", rv.keywords)
+            self.assertEqual(None, rv.long_description_content_type)
+            self.assertEqual("README.md", rv.description)
+            self.assertEqual(">=3.7", rv.requires_python)
 
     def test_pep621_extras(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -40,6 +68,32 @@ marker = ["Bar ; python_version < '3'", "Baz <= 2; python_version < '3'"]
                 rv.reqs,
             )
             self.assertEqual(frozenset({"dev", "marker"}), rv.provides_extra)
+
+    def test_poetry_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "pyproject.toml").write_text(
+                """\
+[tool.poetry]
+name = "somepkg"
+version = "1.2.30"
+description = "Example Summary"
+authors = ["chicken <duck@example.com>"]
+readme = "README.md"
+keywords = ["farm", "animals"]
+homepage = "https://example.com"
+"""
+            )
+            rv = basic_metadata_from_source_checkout(Path(d))
+            self.assertEqual("somepkg", rv.name)
+            self.assertEqual("1.2.30", rv.version)
+            self.assertEqual("Example Summary", rv.summary)
+            self.assertEqual("https://example.com", rv.url)
+            self.assertEqual({}, rv.project_urls)
+            self.assertEqual("['chicken <duck@example.com>']", rv.author)
+            self.assertEqual("['farm', 'animals']", rv.keywords)
+            self.assertEqual(None, rv.long_description_content_type)
+            self.assertEqual("README.md", rv.description)
+            self.assertEqual(None, rv.requires_python)
 
     def test_poetry_full(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -163,3 +217,33 @@ marker =
                 frozenset({"dev", "marker"}),
                 rv.provides_extra,
             )
+
+    def test_setuptools_cfg_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "setup.cfg").write_text(
+                """\
+[metadata]
+name = somepkg
+description = Example Summary
+long_description = file: README.md
+long_description_content_type = text/markdown
+license = MIT
+url = https://example.com
+author = chicken
+author_email = duck@example.com
+
+[options]
+python_requires = >=3.7
+"""
+            )
+            rv = basic_metadata_from_source_checkout(Path(d))
+            self.assertEqual("somepkg", rv.name)
+            self.assertEqual(None, rv.version)
+            self.assertEqual("Example Summary", rv.summary)
+            self.assertEqual("https://example.com", rv.url)
+            self.assertEqual("chicken", rv.author)
+            self.assertEqual("duck@example.com", rv.author_email)
+            self.assertEqual(None, rv.keywords)
+            self.assertEqual("file: README.md", rv.description)
+            self.assertEqual(">=3.7", rv.requires_python)
+            self.assertEqual("text/markdown", rv.long_description_content_type)

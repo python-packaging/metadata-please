@@ -1,17 +1,43 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from email import message_from_string
-from typing import Sequence
+from types import MappingProxyType
+from typing import Mapping, Optional, Sequence
 
 
 @dataclass(frozen=True)
 class BasicMetadata:
     # Popualted from Requires-Dist or requires.txt
-    reqs: Sequence[str]
+    reqs: Sequence[str] = ()
     # Populated from Provides-Extra
-    provides_extra: frozenset[str]
+    provides_extra: frozenset[str] = field(default_factory=frozenset)
+    # Populated from Name
+    name: Optional[str] = None
+    version: Optional[str] = None
+    requires_python: Optional[str] = None
+    url: Optional[str] = None
+    project_urls: Mapping[str, str] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    author: Optional[str] = None
+    author_email: Optional[str] = None
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    keywords: Optional[str] = None
+    long_description_content_type: Optional[str] = None
+
+    def __or__(self, other: BasicMetadata) -> BasicMetadata:
+        """
+        Fieldwise `or` -- if both copies are truthy, prefer `other`'s.
+        """
+        # N.b. this can't use asdict because it tries to copy, and
+        # MappingProxyType isn't pickleable.
+        my_args = self.__dict__.copy()
+        truthy_other_args = {k: v for k, v in other.__dict__.items() if v}
+        my_args.update(truthy_other_args)
+        return BasicMetadata(**my_args)
 
     @classmethod
     def from_metadata(cls, metadata: bytes) -> BasicMetadata:
@@ -19,18 +45,36 @@ class BasicMetadata:
         return BasicMetadata(
             msg.get_all("Requires-Dist") or (),
             frozenset(msg.get_all("Provides-Extra") or ()),
+            msg.get("Name"),
+            msg.get("Version"),
+            msg.get("Requires-Python"),
+            msg.get("Home-Page"),
+            {
+                k: v
+                for k, _, v in map(
+                    (lambda line: line.partition("=")), msg.get_all("Project-URL") or ()
+                )
+            },
+            msg.get("Author"),
+            msg.get("Author-Email"),
+            msg.get("Summary"),
+            msg.get("Description") or msg.get_payload() or None,
+            msg.get("Keywords"),
+            msg.get("Description-Content-Type"),
         )
 
     @classmethod
     def from_sdist_pkg_info_and_requires(
         cls, pkg_info: bytes, requires: bytes
     ) -> BasicMetadata:
-        # We can either get Provides-Extra from this, or from the section
-        # headers in requires.txt...
-        # msg = message_from_string(pkg_info.decode("utf-8"))
-        return cls(
-            *convert_sdist_requires(requires.decode("utf-8")),
-        )
+        # Both of these can theoretically include Provides-Extra; we keep the
+        # pkg-info version if present.
+
+        pkg_info_metadata = cls.from_metadata(pkg_info)
+        seq_requires, provides_extra = convert_sdist_requires(requires.decode("utf-8"))
+        sdist_metadata = cls(reqs=seq_requires, provides_extra=provides_extra)
+
+        return sdist_metadata | pkg_info_metadata
 
 
 def convert_sdist_requires(data: str) -> tuple[tuple[str, ...], frozenset[str]]:

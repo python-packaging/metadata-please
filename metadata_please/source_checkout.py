@@ -11,8 +11,10 @@ Prefers:
 
 Notably, does not read nontrivial setup.py or attempt to emulate anything that can't be read staticly.
 """
+
 import ast
 import re
+from dataclasses import asdict
 from pathlib import Path
 
 try:
@@ -80,6 +82,54 @@ def from_pep621_checkout(path: Path) -> bytes:
         buf.append(f"Provides-Extra: {extra_name}\n")
         for i in v:
             buf.append("Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n")
+
+    name = doc.get("project", {}).get("name")
+    if name:
+        buf.append(f"Name: {name}\n")
+
+    # Version
+    version = doc.get("project", {}).get("version")
+    if version:
+        buf.append(f"Version: {version}\n")
+
+    # Requires-Python
+    requires_python = doc.get("project", {}).get("requires-python")
+    if requires_python:
+        buf.append(f"Requires-Python: {requires_python}\n")
+
+    # Project-URL
+    urls = doc.get("project", {}).get("urls")
+    if urls:
+        for k, v in urls.items():
+            buf.append(f"Project-URL: {k}={v}\n")
+
+    # Author
+    authors = doc.get("project", {}).get("authors")
+    if authors:
+        for author in authors:
+            try:
+                buf.append(f"Author: {author.get('name')}\n")
+            except AttributeError:
+                pass
+            try:
+                buf.append(f"Author-Email: {author.get('email')}\n")
+            except AttributeError:
+                pass
+
+    # Summary
+    summary = doc.get("project", {}).get("description")
+    if summary:
+        buf.append(f"Summary: {summary}\n")
+
+    # Description
+    description = doc.get("project", {}).get("readme")
+    if description:
+        buf.append(f"Description: {description}\n")
+
+    # Keywords
+    keywords = doc.get("project", {}).get("keywords")
+    if keywords:
+        buf.append(f"Keywords: {keywords}\n")
 
     return "".join(buf).encode("utf-8")
 
@@ -193,6 +243,45 @@ def from_poetry_checkout(path: Path) -> bytes:
                 f"Requires-Dist: {vi}{constraints}{merge_extra_marker(k, markers)}"
             )
 
+    name = doc.get("tool", {}).get("poetry", {}).get("name")
+    if name:
+        buf.append(f"Name: {name}\n")
+
+    # Version
+    version = doc.get("tool", {}).get("poetry", {}).get("version")
+    if version:
+        buf.append(f"Version: {version}\n")
+
+    # Requires-Python
+    requires_python = doc.get("tool", {}).get("poetry", {}).get("requires-python")
+    if requires_python:
+        buf.append(f"Requires-Python: {requires_python}\n")
+
+    # Project-URL
+    url = doc.get("tool", {}).get("poetry", {}).get("homepage")
+    if url:
+        buf.append(f"Home-Page: {url}\n")
+
+    # Author
+    authors = doc.get("tool", {}).get("poetry", {}).get("authors")
+    if authors:
+        buf.append(f"Author: {authors}\n")
+
+    # Summary
+    summary = doc.get("tool", {}).get("poetry", {}).get("description")
+    if summary:
+        buf.append(f"Summary: {summary}\n")
+
+    # Description
+    description = doc.get("tool", {}).get("poetry", {}).get("readme")
+    if description:
+        buf.append(f"Description: {description}\n")
+
+    # Keywords
+    keywords = doc.get("tool", {}).get("poetry", {}).get("keywords")
+    if keywords:
+        buf.append(f"Keywords: {keywords}\n")
+
     return "".join(buf).encode("utf-8")
 
 
@@ -206,6 +295,55 @@ def from_setup_cfg_checkout(path: Path) -> bytes:
     rc.read_string(data)
 
     buf: list[str] = []
+    try:
+        buf.append(f"Name: {rc.get('metadata', 'name')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Requires-Python
+    try:
+        buf.append(f"Requires-Python: {rc.get('options', 'python_requires')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Home-Page
+    try:
+        buf.append(f"Home-Page: {rc.get('metadata', 'url')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Author
+    try:
+        buf.append(f"Author: {rc.get('metadata', 'author')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Author-Email
+    try:
+        buf.append(f"Author-Email: {rc.get('metadata', 'author_email')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Summary
+    try:
+        buf.append(f"Summary: {rc.get('metadata', 'description')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Description
+    try:
+        buf.append(f"Description: {rc.get('metadata', 'long_description')}\n")
+    except (NoOptionError, NoSectionError):
+        pass
+
+    # Description-Content-Type
+    try:
+        buf.append(
+            f"Description-Content-Type: {rc.get('metadata', 'long_description_content_type')}\n"
+        )
+    except (NoOptionError, NoSectionError):
+        pass
+
     try:
         for dep in rc.get("options", "install_requires").splitlines():
             dep = dep.strip()
@@ -252,6 +390,7 @@ def from_setup_py_checkout(path: Path) -> bytes:
             raise ValueError("Complex setup call can't extract reqs")
         for dep in r:
             buf.append(f"Requires-Dist: {dep}\n")
+
     er = v.setup_call_args.get("extras_require")
     if er:
         if er is UNKNOWN:
@@ -262,6 +401,31 @@ def from_setup_py_checkout(path: Path) -> bytes:
             for i in deps:
                 buf.append("Requires-Dist: " + merge_extra_marker(extra_name, i) + "\n")
 
+    n = v.setup_call_args.get("name")
+    if n:
+        if n is UNKNOWN:
+            raise ValueError("Complex setup call can't extract name")
+        buf.append(f"Name: {n}\n")
+
+    n = v.setup_call_args.get("python_requires")
+    if n:
+        if n is UNKNOWN:
+            raise ValueError("Complex setup call can't extract python_requires")
+        buf.append(f"Requires-Python: {n}\n")
+
+    n = v.setup_call_args.get("url")
+    if n:
+        if n is UNKNOWN:
+            raise ValueError("Complex setup call can't extract url")
+        buf.append(f"Home-Page: {n}\n")
+
+    n = v.setup_call_args.get("project_urls")
+    if n:
+        if n is UNKNOWN:
+            raise ValueError("Complex setup call can't extract project_urls")
+        for k, v in n.items():
+            buf.append(f"Project-URL: {k}={v}\n")
+
     return "".join(buf).encode("utf-8")
 
 
@@ -270,6 +434,11 @@ def basic_metadata_from_source_checkout(path: Path) -> BasicMetadata:
 
 
 if __name__ == "__main__":  # pragma: no cover
+    import json
     import sys
 
-    print(basic_metadata_from_source_checkout(Path(sys.argv[1])))
+    md = basic_metadata_from_source_checkout(Path(sys.argv[1]))
+    if md.reqs or md.name:
+        print(json.dumps(asdict(md), default=list))
+    else:
+        sys.exit(1)

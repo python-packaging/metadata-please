@@ -11,7 +11,7 @@ coverage of open source
 """
 
 import ast
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 # Copied from orig-index
@@ -93,12 +93,30 @@ class SetupFindingVisitor(QualifiedNameSaver):
         super().__init__()
         self.setup_call_args: Optional[Dict[str, Any]] = None
         self.setup_call_kwargs: Optional[bool] = None
+        self.stack: List[ast.AST] = []
+
+    def locate_assignment_value(self, body: List[ast.AST], name: ast.Name) -> Any:
+        for node in body:
+            if isinstance(node, ast.Assign):
+                if node.targets == [name]:
+                    return node.value
+        return UNKNOWN
+
+    def visit(self, node: ast.AST) -> Any:
+        self.stack.append(node)
+        try:
+            return super().visit(node)
+        finally:
+            self.stack.pop()
 
     def visit_Call(self, node: ast.Call) -> None:
         # .func (expr, can just be name)
         # .args
         # .keywords
-        qn = self.qualified_name(node.func)
+        try:
+            qn = self.qualified_name(node.func)
+        except ValueError:
+            return
         if qn in ("setuptools.setup", "distutils.setup"):
             self.setup_call_args = d = {}
             self.setup_call_kwargs = False
@@ -108,7 +126,18 @@ class SetupFindingVisitor(QualifiedNameSaver):
                     self.setup_call_kwargs = True
                 else:
                     try:
-                        d[k.arg] = ast.literal_eval(k.value)
+                        if isinstance(k.value, ast.Name):
+                            print(self.stack)
+                            for p in self.stack[::-1]:
+                                if hasattr(p, "body"):
+                                    v = self.locate_assignment_value(p.body, k.value)
+                                    if v is not UNKNOWN:
+                                        d[k.arg] = ast.literal_eval(v)
+                                        break
+                            else:
+                                raise ValueError("XXX")
+                        else:
+                            d[k.arg] = ast.literal_eval(k.value)
                     except ValueError:  # malformed node or string...
                         d[k.arg] = UNKNOWN
 
