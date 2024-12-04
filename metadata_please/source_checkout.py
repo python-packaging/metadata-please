@@ -214,26 +214,6 @@ def from_poetry_checkout(path: Path) -> bytes:
 
             if not version:
                 # e.g. git, path or url dependencies, skip for now
-                # e.g. git, path or url dependencies:
-                if "path" in v:
-                    buf.append(v["path"])
-
-                elif "url" in v:
-                    buf.append(v["url"])
-
-                elif "git" in v:
-                    git_link = f"git+{v['git']}"
-
-                    # from both poetry and pypa docs, seems like only one of the following should be specified
-                    revision = v.get("rev") or v.get("tag") or v.get("branch")
-                    if revision:
-                        git_link += f"@{revision}"
-
-                    if "subdirectory" in v:
-                        git_link += f"#subdirectory={v['subdirectory']}"
-
-                    buf.append(f"{k} @ {git_link}")
-
                 continue
 
             # https://python-poetry.org/docs/dependency-specification/#version-constraints
