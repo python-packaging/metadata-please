@@ -105,6 +105,7 @@ a = "1.0"
 a2 = "*"
 b = "^1.2.3"
 b2 = "^0.2.3"
+b3 = "^0.44b0"
 c = "~1.2.3"
 c2 = "~1.2"
 c3 = "~1"
@@ -126,8 +127,9 @@ Foo = ["Opt"]  # intentionally uppercased
                 [
                     "a==1.0",
                     "a2",
-                    "b>=1.2.3,<2",
-                    "b2>=0.2.3,<0.3",
+                    "b>=1.2.3,<2.0.0",
+                    "b2>=0.2.3,<0.3.0",
+                    "b3>=0.44b0,<0.45",
                     "c>=1.2.3,<1.3",
                     "c2>=1.2,<1.3",
                     "c3>=1,<2",
@@ -137,7 +139,7 @@ Foo = ["Opt"]  # intentionally uppercased
                     "https://example.com/my-package-0.1.0.tar.gz",
                     "../my-package/dist/my-other-package-0.1.0.tar.gz",
                     "complex[bar,baz]==2",
-                    'opt>=2.9,<3 ; extra == "foo"',
+                    'opt>=2.9,<3.0 ; extra == "foo"',
                 ],
                 rv.reqs,
             )
