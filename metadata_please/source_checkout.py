@@ -25,6 +25,7 @@ except ImportError:
 from configparser import NoOptionError, NoSectionError, RawConfigParser
 
 from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 from .source_checkout_ast import SetupFindingVisitor, UNKNOWN
 
@@ -139,22 +140,41 @@ def _translate_caret(specifier: str) -> str:
     Given a string like "^0.2.3" returns ">=0.2.3,<0.3.0".
     """
     assert "," not in specifier
-    parts = specifier[1:].split(".")
-    while len(parts) < 3:
-        parts.append("0")
 
-    for i in range(len(parts)):
-        if parts[i] != "0":
-            # The docs are not super clear about how this behaves, but let's
-            # assume integer-valued parts and just let the exception raise
-            # otherwise.
-            incremented = parts[:]
-            incremented[i] = str(int(parts[i]) + 1)
-            del incremented[i + 1 :]
-            incremented_version = ".".join(incremented)
-            break
+    version = Version(specifier[1:])
+
+    # version.release takes out the pre- and post- parts and leaves only numbers
+    version_parts = list(version.release)
+
+    if version.is_prerelease or version.is_postrelease:
+        # Return next version, incrementing the least significant number
+        version_parts[-1] += 1
+
     else:
-        raise ValueError("All components were zero?")
+        if version.major == version.minor == version.micro == 0:
+            raise ValueError("All components were zero?")
+
+        if version.major > 0 or version.minor == 0:
+            # Next major version
+            version_parts[0] += 1
+
+            # Set the rest of the values to 0
+            for i in range(1, len(version_parts)):
+                version_parts[i] = 0
+
+        elif version.minor > 0 or version.micro == 0:
+            # Next minor version.
+            version_parts[1] += 1
+
+            # Set the rest of the values to 0
+            for i in range(2, len(version_parts)):
+                version_parts[i] = 0
+
+        else:
+            # Next patch version
+            version_parts[2] += 1
+
+    incremented_version = ".".join([str(i) for i in version_parts])
     return f">={specifier[1:]},<{incremented_version}"
 
 
