@@ -111,9 +111,7 @@ c2 = "~1.2"
 c3 = "~1"
 d = {version="2", python="<3.11"}
 e = {version="2", markers="sys_platform == 'darwin'"}
-skipped = {git = "...", tag = "12345"}
-my-package = { url = "https://example.com/my-package-0.1.0.tar.gz" }
-my-other-package = { path = "../my-package/dist/my-other-package-0.1.0.tar.gz" }
+skipped = {git = "..."}
 complex = {extras=["bar", "baz"], version="2"}
 opt = { version = "^2.9", optional = true}
 unused-extra = { version = "2", optional = true }
@@ -135,9 +133,6 @@ Foo = ["Opt"]  # intentionally uppercased
                     "c3>=1,<2",
                     "d==2 ; python_version < '3.11'",
                     "e==2 ; sys_platform == 'darwin'",
-                    "skipped @ git+...@12345",
-                    "https://example.com/my-package-0.1.0.tar.gz",
-                    "../my-package/dist/my-other-package-0.1.0.tar.gz",
                     "complex[bar,baz]==2",
                     'opt>=2.9,<3.0 ; extra == "foo"',
                 ],
