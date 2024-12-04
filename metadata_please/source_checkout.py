@@ -151,6 +151,9 @@ def _translate_caret(specifier: str) -> str:
         version_parts[-1] += 1
 
     else:
+        if version.major == version.minor == version.micro == 0:
+            raise ValueError("All components were zero?")
+
         if version.major > 0 or version.minor == 0:
             # Next major version
             version_parts[0] += 1
