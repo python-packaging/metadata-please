@@ -142,7 +142,10 @@ def _translate_caret(specifier: str) -> str:
     assert "," not in specifier
 
     version = Version(specifier[1:])
+
+    # version.release takes out the pre- and post- parts and leaves only numbers
     version_parts = list(version.release)
+
     if version.is_prerelease or version.is_postrelease:
         # Return next version, incrementing the least significant number
         version_parts[-1] += 1
